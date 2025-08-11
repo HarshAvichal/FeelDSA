@@ -66,6 +66,37 @@ export const selectionSort = {
     time: 'O(n²)',
     space: 'O(1)'
   },
+  
+  // Educational content
+  explanation: {
+    overview: 'Selection Sort works by dividing the array into a sorted and unsorted region. It repeatedly selects the smallest element from the unsorted region and places it at the end of the sorted region.',
+    howItWorks: [
+      'Start with an empty sorted region and the entire array as unsorted',
+      'Find the smallest element in the unsorted region',
+      'Swap this smallest element with the first element of the unsorted region',
+      'Move the boundary between sorted and unsorted regions one element to the right',
+      'Repeat the process until the unsorted region becomes empty',
+      'The array is now sorted in ascending order'
+    ],
+    advantages: [
+      'Simple to understand and implement',
+      'Performs well on small lists',
+      'Minimal memory usage (in-place sorting)',
+      'Number of swaps is O(n) - fewer swaps than Bubble Sort'
+    ],
+    disadvantages: [
+      'Inefficient for large datasets due to O(n²) time complexity',
+      'Not adaptive - performance doesn\'t improve on nearly sorted data',
+      'Poor performance compared to more advanced algorithms',
+      'Always performs the same number of comparisons regardless of data'
+    ],
+    optimizations: [
+      'Can be modified to find both minimum and maximum in each pass',
+      'Use of sentinel values can reduce some comparisons',
+      'Early termination possible if array becomes sorted'
+    ]
+  },
+  
   code: `// Selection Sort in C++
 void selectionSort(int arr[], int n) {
   for (int i = 0; i < n - 1; i++) {
@@ -79,8 +110,7 @@ void selectionSort(int arr[], int n) {
     arr[i] = arr[minIdx];
     arr[minIdx] = temp;
   }
-}
-`,
+}`,
   steps: (array) => {
     const steps = [];
     const arr = deepCopy(array);
@@ -138,6 +168,38 @@ export const insertionSort = {
     time: 'O(n²)',
     space: 'O(1)'
   },
+  
+  // Educational content
+  explanation: {
+    overview: 'Insertion Sort works by building the final sorted array one element at a time. It takes each element from the unsorted portion and inserts it into its correct position in the sorted portion.',
+    howItWorks: [
+      'Start with the first element as the sorted portion',
+      'Take the next element from the unsorted portion',
+      'Compare it with elements in the sorted portion from right to left',
+      'Shift larger elements to the right to make space',
+      'Insert the current element in its correct position',
+      'Repeat until all elements are in the sorted portion'
+    ],
+    advantages: [
+      'Simple to understand and implement',
+      'Efficient for small data sets',
+      'Adaptive - performs well on nearly sorted data',
+      'Stable sorting algorithm',
+      'In-place sorting with O(1) space complexity'
+    ],
+    disadvantages: [
+      'Inefficient for large datasets due to O(n²) time complexity',
+      'Poor performance on reverse-sorted data',
+      'Many element shifts required',
+      'Not suitable for linked lists due to random access requirement'
+    ],
+    optimizations: [
+      'Binary search can reduce comparisons in the insertion step',
+      'Use of sentinel values can simplify boundary checking',
+      'Early termination when element is already in correct position'
+    ]
+  },
+  
   code: `// Insertion Sort in C++
 void insertionSort(int arr[], int n) {
   for (int i = 1; i < n; i++) {
@@ -149,8 +211,7 @@ void insertionSort(int arr[], int n) {
     }
     arr[j + 1] = key;
   }
-}
-`,
+}`,
   steps: (array) => {
     const steps = [];
     const arr = deepCopy(array);

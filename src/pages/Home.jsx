@@ -144,6 +144,22 @@ const Home = () => {
                   complexity={topic.complexity}
                   onClick={() => navigate('/enhanced-bubble-sort')}
                 />
+              ) : topic.topic === 'Selection Sort' ? (
+                <DsaCard
+                  topic={topic.topic}
+                  description={topic.description}
+                  category={topic.category}
+                  complexity={topic.complexity}
+                  onClick={() => navigate('/enhanced-selection-sort')}
+                />
+              ) : topic.topic === 'Insertion Sort' ? (
+                <DsaCard
+                  topic={topic.topic}
+                  description={topic.description}
+                  category={topic.category}
+                  complexity={topic.complexity}
+                  onClick={() => navigate('/enhanced-insertion-sort')}
+                />
               ) : topic.topic === 'Popular Binary Search Problems' ? (
                 <DsaCard
                   topic={topic.topic}
