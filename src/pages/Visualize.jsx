@@ -6,6 +6,7 @@ import { useVisualizer } from '../context/VisualizerContext'
 import Visualizer from '../components/Visualizer'
 import AITutorChat from '../components/AITutorChat'
 import { algorithms, dataStructures, getOperationSteps, generateRandomArray, getSortedArray, getAlgorithmSteps } from '../utils/algorithms'
+import { binarySearchProblems } from '../utils/algorithms/binarySearchProblems'
 import toast from 'react-hot-toast'
 import Tippy from '@tippyjs/react'
 import Swal from 'sweetalert2'
@@ -139,22 +140,39 @@ const Visualize = () => {
 
   const handleNewArray = () => {
     const newArray = generateRandomArray(8, 1, 50);
-    const algorithmSteps = getAlgorithmSteps(decodedTopic, newArray, null);
-    setSteps(algorithmSteps);
-    dispatch({ type: 'SET_TOTAL_STEPS', payload: algorithmSteps.length });
-    dispatch({ type: 'SET_PLAYING', payload: false });
     
-    if (algorithmSteps.length > 0) {
-      const firstStep = algorithmSteps[0];
+    if (topicData?.type === 'binarySearchProblem') {
+      // For binary search problems, we don't generate steps immediately
+      // Just set the array and let user perform search operation
+      dispatch({ type: 'SET_ARRAY_STATE', payload: newArray });
       dispatch({ 
         type: 'SET_STEP', 
         payload: {
           stepIndex: 0,
-          highlightedIndices: firstStep.highlightedIndices,
-          operationDescription: firstStep.operationDescription
+          highlightedIndices: {},
+          operationDescription: `New array created. Ready to perform ${topicData.name.toLowerCase()}.`
         }
       });
-      dispatch({ type: 'SET_ARRAY_STATE', payload: firstStep.array });
+      dispatch({ type: 'SET_TOTAL_STEPS', payload: 1 });
+      dispatch({ type: 'SET_PLAYING', payload: false });
+    } else {
+      const algorithmSteps = getAlgorithmSteps(decodedTopic, newArray, null);
+      setSteps(algorithmSteps);
+      dispatch({ type: 'SET_TOTAL_STEPS', payload: algorithmSteps.length });
+      dispatch({ type: 'SET_PLAYING', payload: false });
+      
+      if (algorithmSteps.length > 0) {
+        const firstStep = algorithmSteps[0];
+        dispatch({ 
+          type: 'SET_STEP', 
+          payload: {
+            stepIndex: 0,
+            highlightedIndices: firstStep.highlightedIndices,
+            operationDescription: firstStep.operationDescription
+          }
+        });
+        dispatch({ type: 'SET_ARRAY_STATE', payload: firstStep.array });
+      }
     }
   };
 
@@ -162,8 +180,26 @@ const Visualize = () => {
     const algorithmData = algorithms[decodedTopic]
     const dataStructureData = dataStructures[decodedTopic]
     
+    // Check if this is a binary search problem from the URL
+    const isBinarySearchProblem = decodedTopic.includes('binary-search-problems/')
+    let problemName = null
+    
+    if (isBinarySearchProblem) {
+      // Extract problem name from URL
+      const urlParts = decodedTopic.split('/')
+      problemName = urlParts[urlParts.length - 1].replace(/-/g, ' ')
+      // Convert to proper case (e.g., "first occurrence" -> "First Occurrence")
+      problemName = problemName.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ')
+    }
+    
+    const binarySearchProblemData = problemName ? binarySearchProblems[problemName] : null
+    
     let resolvedTopicData;
-    if (algorithmData) {
+    if (binarySearchProblemData) {
+      resolvedTopicData = { ...binarySearchProblemData, type: 'binarySearchProblem', name: problemName };
+    } else if (algorithmData) {
       resolvedTopicData = { ...algorithmData, type: 'algorithm', name: decodedTopic };
     } else if (dataStructureData) {
       resolvedTopicData = { ...dataStructureData, type: 'dataStructure', name: decodedTopic };
@@ -320,13 +356,13 @@ const Visualize = () => {
     switch (operation) {
         // Shared Operations
         case 'search':
-            if (decodedTopic === 'Binary Search' || decodedTopic === 'Linear Search') {
+            if (decodedTopic === 'Binary Search' || decodedTopic === 'Linear Search' || topicData?.type === 'binarySearchProblem') {
               if (isNaN(parsedValue)) { 
                 toast.error("Please enter a valid target value."); 
                 return; 
               }
               
-              if (decodedTopic === 'Binary Search') {
+              if (decodedTopic === 'Binary Search' || topicData?.type === 'binarySearchProblem') {
                 const isArraySorted = arrayState.length > 0 && arrayState.every((item, index) => 
                   index === 0 || item === null || arrayState[index - 1] === null || item.value >= arrayState[index - 1].value
                 );
@@ -337,7 +373,22 @@ const Visualize = () => {
                 }
               }
               
-              operationSteps = getAlgorithmSteps(decodedTopic, arrayState, parsedValue);
+              if (topicData?.type === 'binarySearchProblem') {
+                // Handle binary search problems
+                if (topicData.name === 'Peak Element' || topicData.name === 'Find Minimum in Rotated Array') {
+                  // These problems don't need a target value
+                  operationSteps = topicData.steps(arrayState);
+                } else if (topicData.name === 'Sqrt(x)') {
+                  // Sqrt(x) doesn't need an array, just the target value
+                  operationSteps = topicData.steps([], parsedValue);
+                } else {
+                  // Other problems need a target value
+                  operationSteps = topicData.steps(arrayState, parsedValue);
+                }
+              } else {
+                operationSteps = getAlgorithmSteps(decodedTopic, arrayState, parsedValue);
+              }
+              
               setSteps(operationSteps);
               dispatch({ type: 'SET_TOTAL_STEPS', payload: operationSteps.length });
               
@@ -362,16 +413,50 @@ const Visualize = () => {
             } else if (decodedTopic === '2D Arrays') {
                const customInput = options.isRandom ? '' : customArray;
                operationSteps = getOperationSteps(decodedTopic, 'create', arrayState, parsedRows, parsedCols, customInput);
-            } else if (decodedTopic === 'Binary Search' || decodedTopic === 'Linear Search') {
-              if (parsedCustomArray.length === 0) { 
-                toast.error("Please enter a valid, comma-separated list of numbers."); 
-                return; 
-              }
-              if (parsedCustomArray.length > 15) {
-                toast.error("Please enter 15 or fewer numbers for optimal visualization.");
+            } else if (decodedTopic === 'Binary Search' || decodedTopic === 'Linear Search' || topicData?.type === 'binarySearchProblem') {
+              if (topicData?.name === 'Sqrt(x)') {
+                // Sqrt(x) doesn't need an array, just set empty array
+                dispatch({ type: 'SET_ARRAY_STATE', payload: [] });
+                dispatch({ 
+                  type: 'SET_STEP', 
+                  payload: {
+                    stepIndex: 0,
+                    highlightedIndices: {},
+                    operationDescription: 'Enter a number to find its square root.'
+                  }
+                });
+                dispatch({ type: 'SET_TOTAL_STEPS', payload: 1 });
                 return;
+              } else if (topicData?.name === 'Peak Element') {
+                // For Peak Element, create a mountain array
+                if (parsedCustomArray.length === 0) {
+                  // Use default mountain array if no custom input
+                  const defaultMountainArray = [1, 3, 5, 4, 2];
+                  operationSteps = getOperationSteps('Arrays', 'create', arrayState, defaultMountainArray, defaultMountainArray.length);
+                } else {
+                  operationSteps = getOperationSteps('Arrays', 'create', arrayState, parsedCustomArray, parsedCustomArray.length);
+                }
+              } else if (topicData?.name === 'Find Minimum in Rotated Array') {
+                // For Find Minimum, create a rotated sorted array
+                if (parsedCustomArray.length === 0) {
+                  // Use default rotated array if no custom input
+                  const defaultRotatedArray = [4, 5, 6, 7, 0, 1, 2];
+                  operationSteps = getOperationSteps('Arrays', 'create', arrayState, defaultRotatedArray, defaultRotatedArray.length);
+                } else {
+                  operationSteps = getOperationSteps('Arrays', 'create', arrayState, parsedCustomArray, parsedCustomArray.length);
+                }
+              } else {
+                // Default case for other binary search problems
+                if (parsedCustomArray.length === 0) { 
+                  toast.error("Please enter a valid, comma-separated list of numbers."); 
+                  return; 
+                }
+                if (parsedCustomArray.length > 15) {
+                  toast.error("Please enter 15 or fewer numbers for optimal visualization.");
+                  return;
+                }
+                operationSteps = getOperationSteps('Arrays', 'create', arrayState, parsedCustomArray, parsedCustomArray.length);
               }
-              operationSteps = getOperationSteps('Arrays', 'create', arrayState, parsedCustomArray, parsedCustomArray.length);
             }
             break;
         case 'insert':
@@ -947,7 +1032,141 @@ const Visualize = () => {
     );
   }
 
+  const renderBinarySearchProblemControlsContent = () => {
+    if (topicData?.type !== 'binarySearchProblem') return null;
+
+    const sharedButtonClass = (primary = false) => 
+      `btn ${primary ? 'btn-primary' : 'btn-secondary'} flex items-center justify-center w-full h-10 disabled:opacity-50 disabled:cursor-not-allowed`;
+
+    const iconButtonClass = () => 
+      `btn btn-secondary flex items-center justify-center w-10 h-10 p-0 disabled:opacity-50 disabled:cursor-not-allowed`;
+
+    return (
+      <>
+        <h3 className="text-lg font-semibold mb-4">{topicData.name}</h3>
+        
+        <div className="space-y-4">
+          {/* Create Array */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {topicData.name === 'Sqrt(x)' ? 'Enter Number' : 'Create Array'}
+            </label>
+            
+            {topicData.name === 'Sqrt(x)' ? (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  name="value"
+                  value={inputs.value}
+                  onChange={handleInputChange}
+                  placeholder="e.g., 16"
+                  className="input flex-grow"
+                  disabled={isAnimating}
+                />
+                <button 
+                  onClick={() => handleOperation('search')} 
+                  className={sharedButtonClass(true)} 
+                  disabled={isAnimating || !inputs.value}
+                >
+                  <Search size={16} className="mr-2" /> Find Sqrt
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="customArray"
+                    value={inputs.customArray}
+                    onChange={handleInputChange}
+                    placeholder={topicData.name === 'Peak Element' ? "e.g., 1, 3, 5, 4, 2" : 
+                                 topicData.name === 'Find Minimum in Rotated Array' ? "e.g., 4, 5, 6, 7, 0, 1, 2" :
+                                 "e.g., 1, 2, 2, 2, 3, 4, 5"}
+                    className="input flex-grow"
+                    disabled={isAnimating}
+                  />
+                  <Tippy content="Randomize">
+                    <button onClick={handleRandomArray} className={iconButtonClass()} disabled={isAnimating}>
+                      <Dice5 size={20} />
+                    </button>
+                  </Tippy>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button onClick={handleCreateWithConfirmation} className="btn btn-primary flex-grow" disabled={isAnimating}>
+                    <Play size={16} className="mr-2" /> Create Array
+                  </button>
+                  <Tippy content="Clear Array">
+                    <button onClick={handleClearWithConfirmation} className={iconButtonClass()} disabled={isAnimating || arrayState.length === 0}>
+                      <Trash2 size={20} />
+                    </button>
+                  </Tippy>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Search Operation */}
+          {topicData.name !== 'Sqrt(x)' && (
+            <>
+              <hr />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {topicData.name === 'Peak Element' ? 'Find Peak' :
+                   topicData.name === 'Find Minimum in Rotated Array' ? 'Find Minimum' :
+                   'Search Target'}
+                </label>
+                
+                {topicData.name === 'Peak Element' || topicData.name === 'Find Minimum in Rotated Array' ? (
+                  <button 
+                    onClick={() => handleOperation('search')} 
+                    className={sharedButtonClass(true)} 
+                    disabled={isAnimating || arrayState.length === 0}
+                  >
+                    <Search size={16} className="mr-2" />
+                    {topicData.name === 'Peak Element' ? 'Find Peak Element' : 'Find Minimum'}
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      name="value"
+                      value={inputs.value}
+                      onChange={handleInputChange}
+                      placeholder="Enter target"
+                      className="input flex-grow"
+                      disabled={isAnimating}
+                    />
+                    <button 
+                      onClick={() => handleOperation('search')} 
+                      className={sharedButtonClass(true)} 
+                      disabled={isAnimating || !inputs.value || arrayState.length === 0}
+                    >
+                      <Search size={16} className="mr-2" /> Search
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* New Array Button */}
+          {topicData.name !== 'Sqrt(x)' && (
+            <>
+              <hr />
+              <div>
+                <button onClick={handleNewArray} className={sharedButtonClass()} disabled={isAnimating}>
+                  <Dice5 size={16} className="mr-2" /> New Array
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </>
+    );
+  };
+
   const renderControlsContent = () => {
+    if (topicData?.type === 'binarySearchProblem') return renderBinarySearchProblemControlsContent();
     if (dataStructures[decodedTopic]) return renderDataStructureControlsContent();
     if (decodedTopic === 'Linear Search') return renderLinearSearchControlsContent();
     if (decodedTopic === 'Binary Search') return renderBinarySearchControlsContent();
@@ -1095,7 +1314,7 @@ const Visualize = () => {
             />
 
             {/* Standalone Controls for Algorithms */}
-            {topicData?.type === 'algorithm' && totalSteps > 1 && (
+            {(topicData?.type === 'algorithm' || topicData?.type === 'binarySearchProblem') && totalSteps > 1 && (
               <div className="card">
                 <h3 className="text-lg font-semibold mb-4">Controls</h3>
                 <div className="flex items-center gap-4">

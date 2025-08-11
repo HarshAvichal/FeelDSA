@@ -4,6 +4,7 @@ import { VisualizerProvider } from './context/VisualizerContext'
 import Home from './pages/Home'
 import Visualize from './pages/Visualize'
 import EnhancedBubbleSort from './pages/EnhancedBubbleSort'
+import BinarySearchProblems from './pages/BinarySearchProblems'
 import './App.css'
 
 function App() {
@@ -26,6 +27,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/visualize/:topic" element={<Visualize />} />
             <Route path="/enhanced-bubble-sort" element={<EnhancedBubbleSort />} />
+            <Route path="/binary-search-problems" element={<BinarySearchProblems />} />
+            <Route path="/visualize/binary-search-problems/:problem" element={<Visualize />} />
           </Routes>
         </div>
       </Router>

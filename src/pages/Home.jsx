@@ -144,6 +144,14 @@ const Home = () => {
                   complexity={topic.complexity}
                   onClick={() => navigate('/enhanced-bubble-sort')}
                 />
+              ) : topic.topic === 'Popular Binary Search Problems' ? (
+                <DsaCard
+                  topic={topic.topic}
+                  description={topic.description}
+                  category={topic.category}
+                  complexity={topic.complexity}
+                  onClick={() => navigate('/binary-search-problems')}
+                />
               ) : (
                 <DsaCard
                   topic={topic.topic}
