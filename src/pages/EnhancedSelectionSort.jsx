@@ -72,6 +72,8 @@ const EnhancedSelectionSort = () => {
   const [viewMode, setViewMode] = useState('array');
   const [showLearnSection, setShowLearnSection] = useState(false);
   const [showCodeSection, setShowCodeSection] = useState(false);
+  const [showControls, setShowControls] = useState(false); // New state for button toggle
+  const [originalArray, setOriginalArray] = useState([]); // Store the original unsorted array
   
   const {
     arrayState,
@@ -100,6 +102,16 @@ const EnhancedSelectionSort = () => {
     'Small Range': [1, 2, 1, 2, 1, 2, 1, 2]
   };
 
+  // Initialize array on component mount
+  useEffect(() => {
+    const initialArray = predefinedDatasets['Random'].map(value => ({
+      id: getUniqueId(),
+      value: value
+    }));
+    dispatch({ type: 'SET_ARRAY_STATE', payload: initialArray });
+    setOriginalArray([...initialArray]);
+  }, []);
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setInputs(prev => ({
@@ -117,6 +129,7 @@ const EnhancedSelectionSort = () => {
         value: value
       }));
       dispatch({ type: 'SET_ARRAY_STATE', payload: arrayWithIds });
+      setOriginalArray([...arrayWithIds]); // Store the original array
     }
   };
 
@@ -129,6 +142,7 @@ const EnhancedSelectionSort = () => {
           value: value
         }));
         dispatch({ type: 'SET_ARRAY_STATE', payload: arrayWithIds });
+        setOriginalArray([...arrayWithIds]); // Store the original array
         setInputs(prev => ({ ...prev, selectedDataset: 'Custom' }));
       }
     }
@@ -141,62 +155,95 @@ const EnhancedSelectionSort = () => {
       value: value
     }));
     dispatch({ type: 'SET_ARRAY_STATE', payload: arrayWithIds });
+    setOriginalArray([...arrayWithIds]); // Store the original array
     setInputs(prev => ({ ...prev, selectedDataset: 'Random' }));
   };
 
   const handleStartSort = () => {
     if (arrayState.length === 0) return;
     
+    // Show control buttons and hide start button
+    setShowControls(true);
+    
+    // Set playing state to true since animation starts immediately
+    dispatch({ type: 'SET_PLAYING', payload: true });
     dispatch({ type: 'SET_ANIMATING', payload: true });
-    const startTime = performance.now();
     
     // Generate steps for selection sort
     const steps = selectionSort.steps(arrayState);
     dispatch({ type: 'SET_TOTAL_STEPS', payload: steps.length });
     dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
     
-    // Calculate performance metrics
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    
-    // Count comparisons and swaps from steps
+    // Initialize metrics
     let comparisons = 0;
     let swaps = 0;
-    steps.forEach(step => {
-      if (step.highlightedIndices?.primary) {
-        comparisons++;
-      }
-      if (step.highlightedIndices?.success) {
-        swaps++;
-      }
-    });
-    
-    dispatch({
-      type: 'SET_PERFORMANCE_METRICS',
-      payload: {
-        comparisons,
-        swaps,
-        passes: Math.ceil(steps.length / arrayState.length),
-        duration: Math.round(duration)
-      }
-    });
+    let passes = 0;
     
     // Start animation
     let currentStepIndex = 0;
+    let isPaused = false; // Track pause state
+    
     const animateSteps = () => {
-      if (currentStepIndex < steps.length) {
-        dispatch({ type: 'SET_STEP', payload: steps[currentStepIndex] });
+      if (currentStepIndex < steps.length && !isPaused) {
+        const currentStep = { ...steps[currentStepIndex], stepIndex: currentStepIndex };
+        dispatch({ type: 'SET_STEP', payload: currentStep });
         dispatch({ type: 'SET_STEP_INDEX', payload: currentStepIndex });
+        
+        // Update metrics dynamically based on current step
+        if (currentStep.highlightedIndices?.primary && currentStep.highlightedIndices?.secondary) {
+          // This is a comparison step
+          comparisons++;
+        }
+        if (currentStep.highlightedIndices?.success) {
+          // This is a swap completion step
+          swaps++;
+        }
+        if (currentStep.operationDescription?.includes('pass') || currentStep.operationDescription?.includes('Pass')) {
+          // This is a new pass
+          passes++;
+        }
+        
+        // Update performance metrics in real-time
+        // Calculate realistic algorithm execution time based on operations performed
+        const baseTimePerComparison = 0.1; // 0.1ms per comparison
+        const baseTimePerSwap = 0.5; // 0.5ms per swap
+        const algorithmExecutionTime = Math.round(
+          (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+        );
+        
+        dispatch({
+          type: 'SET_PERFORMANCE_METRICS',
+          payload: {
+            comparisons,
+            swaps,
+            passes: passes, // Only increment when a pass is actually completed
+            duration: Math.max(1, algorithmExecutionTime) // Minimum 1ms, then realistic progression
+          }
+        });
+        
         currentStepIndex++;
         
         const speed = inputs.animationSpeed === 'Fast (0.5s)' ? 500 : 
                      inputs.animationSpeed === 'Slow (2s)' ? 2000 : 1000;
         
         setTimeout(animateSteps, speed);
-      } else {
+      } else if (currentStepIndex >= steps.length) {
         dispatch({ type: 'SET_ANIMATING', payload: false });
         dispatch({ type: 'SET_PLAYING', payload: false });
+        
+        // Hide control buttons and show start button again
+        setShowControls(false);
       }
+    };
+    
+    // Store the pause/resume functions in the component scope
+    window.pauseAnimation = () => {
+      isPaused = true;
+    };
+    
+    window.resumeAnimation = () => {
+      isPaused = false;
+      animateSteps(); // Continue from current step
     };
     
     animateSteps();
@@ -204,27 +251,108 @@ const EnhancedSelectionSort = () => {
 
   const handlePlayPause = () => {
     if (totalSteps <= 1) return;
-    dispatch({ type: 'SET_PLAYING', payload: !isPlaying });
+    
+    if (isPlaying) {
+      // Pause: Stop the animation
+      dispatch({ type: 'SET_PLAYING', payload: false });
+      dispatch({ type: 'SET_ANIMATING', payload: false });
+      window.pauseAnimation(); // Actually pause the animation
+    } else {
+      // Resume: Continue the animation from current step
+      dispatch({ type: 'SET_PLAYING', payload: true });
+      dispatch({ type: 'SET_ANIMATING', payload: true });
+      window.resumeAnimation(); // Resume the animation
+    }
   };
 
   const handleReset = () => {
+    // Stop any ongoing animation
     dispatch({ type: 'SET_PLAYING', payload: false });
-    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
-    if (currentStep) {
-      dispatch({ type: 'SET_STEP', payload: currentStep });
+    dispatch({ type: 'SET_ANIMATING', payload: false });
+    
+    // Reset to initial array state (unsorted)
+    if (originalArray.length > 0) {
+      dispatch({ type: 'SET_ARRAY_STATE', payload: [...originalArray] });
     }
+    
+    // Reset step tracking
+    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
+    dispatch({ type: 'SET_TOTAL_STEPS', payload: 0 });
+    dispatch({ type: 'SET_STEP', payload: null });
+    
+    // Show start button again (Ready to Sort section)
+    setShowControls(false);
+    
+    // Reset performance metrics
+    dispatch({
+      type: 'SET_PERFORMANCE_METRICS',
+      payload: {
+        comparisons: 0,
+        swaps: 0,
+        passes: 0,
+        duration: 0
+      }
+    });
   };
 
   const handleNext = () => {
     if (stepIndex < totalSteps - 1) {
-      dispatch({ type: 'SET_STEP_INDEX', payload: stepIndex + 1 });
+      const nextStepIndex = stepIndex + 1;
+      dispatch({ type: 'SET_STEP_INDEX', payload: nextStepIndex });
+      
+      // Recalculate metrics up to this step
+      recalculateMetricsUpToStep(nextStepIndex);
     }
   };
 
   const handlePrevious = () => {
     if (stepIndex > 0) {
-      dispatch({ type: 'SET_STEP_INDEX', payload: stepIndex - 1 });
+      const prevStepIndex = stepIndex - 1;
+      dispatch({ type: 'SET_STEP_INDEX', payload: prevStepIndex });
+      
+      // Recalculate metrics up to this step
+      recalculateMetricsUpToStep(prevStepIndex);
     }
+  };
+
+  // Helper function to recalculate metrics up to a specific step
+  const recalculateMetricsUpToStep = (stepIndex) => {
+    if (!currentStep || stepIndex < 0) return;
+    
+    // Get all steps up to the current step
+    const steps = selectionSort.steps(arrayState);
+    const stepsUpToCurrent = steps.slice(0, stepIndex + 1);
+    
+    let comparisons = 0;
+    let swaps = 0;
+    let passes = 0;
+    
+    stepsUpToCurrent.forEach((step, index) => {
+      if (step.highlightedIndices?.primary && step.highlightedIndices?.secondary) {
+        comparisons++;
+      }
+      if (step.highlightedIndices?.success) {
+        swaps++;
+      }
+      if (step.operationDescription?.includes('pass') || step.operationDescription?.includes('Pass')) {
+        passes++;
+      }
+    });
+    
+    // Update the current step with the correct stepIndex
+    const updatedCurrentStep = { ...steps[stepIndex], stepIndex: stepIndex };
+    dispatch({ type: 'SET_STEP', payload: updatedCurrentStep });
+    
+    // Update performance metrics
+    dispatch({
+      type: 'SET_PERFORMANCE_METRICS',
+      payload: {
+        comparisons,
+        swaps,
+        passes: Math.max(passes, Math.ceil((stepIndex + 1) / arrayState.length)),
+        duration: 0 // Duration is only meaningful during animation
+      }
+    });
   };
 
   const handleViewModeChange = (mode) => {
@@ -499,21 +627,63 @@ const EnhancedSelectionSort = () => {
 
           {/* Right Column - Visualization */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Ready to Sort */}
-            <div className="card w-full">
-              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Ready to Sort?</h3>
-              <p className="text-gray-600 mb-4">
-                Click 'Start Selection Sort' to begin the visualization
-              </p>
-              <button
-                onClick={handleStartSort}
-                className="btn btn-primary w-full sm:w-auto text-lg px-8 py-3"
-                disabled={isAnimating || arrayState.length === 0}
-              >
-                <Play className="w-5 h-5 mr-2" />
-                Start Selection Sort
-              </button>
-            </div>
+            {/* Start Button or Controls */}
+            {!showControls ? (
+              // Show Start Button
+              <div className="card w-full">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Ready to Sort?</h3>
+                <p className="text-gray-600 mb-4">
+                  Click 'Start Selection Sort' to begin the visualization
+                </p>
+                <button
+                  onClick={handleStartSort}
+                  className="btn btn-primary w-full sm:w-auto text-lg px-8 py-3"
+                  disabled={isAnimating || arrayState.length === 0}
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  Start Selection Sort
+                </button>
+              </div>
+            ) : (
+              // Show Controls
+              <div className="card w-full">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Controls</h3>
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                  <button
+                    onClick={handlePlayPause}
+                    className={`btn ${isPlaying ? 'btn-secondary' : 'btn-primary'} w-full sm:w-24`}
+                    disabled={totalSteps <= 1}
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                    {isPlaying ? 'Pause' : 'Play'}
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="btn btn-secondary w-full sm:w-24"
+                    disabled={totalSteps <= 1}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset
+                  </button>
+                  <button
+                    onClick={handlePrevious}
+                    className="btn btn-secondary w-full sm:w-24"
+                    disabled={stepIndex === 0}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Previous
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="btn btn-secondary w-full sm:w-24"
+                    disabled={stepIndex === totalSteps - 1}
+                  >
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Main Visualization */}
             <div className="card w-full overflow-x-auto">
@@ -581,49 +751,6 @@ const EnhancedSelectionSort = () => {
                 </div>
               </div>
             </div>
-
-            {/* Controls */}
-            {totalSteps > 1 && (
-              <div className="card w-full">
-                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Controls</h3>
-                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                  <button
-                    onClick={handlePlayPause}
-                    className={`btn ${isPlaying ? 'btn-secondary' : 'btn-primary'} w-full sm:w-24`}
-                    disabled={totalSteps <= 1}
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                    {isPlaying ? 'Pause' : 'Play'}
-                  </button>
-                  <div className="flex flex-row gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={handleReset}
-                      className="btn btn-secondary w-full sm:w-auto"
-                      disabled={totalSteps <= 1}
-                    >
-                      <RotateCcw className="w-4 h-4 mr-1" />
-                      Reset
-                    </button>
-                    <button
-                      onClick={handlePrevious}
-                      className="btn btn-secondary w-full sm:w-auto"
-                      disabled={stepIndex === 0}
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-1" />
-                      Previous
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="btn btn-secondary w-full sm:w-auto"
-                      disabled={stepIndex >= totalSteps - 1}
-                    >
-                      Next
-                      <ArrowRight className="w-4 h-4 ml-1" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

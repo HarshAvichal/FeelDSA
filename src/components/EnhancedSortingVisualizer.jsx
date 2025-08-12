@@ -30,7 +30,7 @@ const EnhancedSortingVisualizer = ({
   comparisonData = null,
   onViewModeChange
 }) => {
-  console.log('[Visualizer] performanceMetrics:', performanceMetrics);
+
   const [showMetrics, setShowMetrics] = useState(true);
   const [showComparison, setShowComparison] = useState(false);
 

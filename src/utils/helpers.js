@@ -5,7 +5,23 @@ import { getUniqueId } from './constants.js';
  * @param {any} obj - Object to copy
  * @returns {any} Deep copy of the object
  */
-export const deepCopy = (obj) => JSON.parse(JSON.stringify(obj));
+export const deepCopy = (obj) => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepCopy(item));
+  }
+  
+  const copied = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      copied[key] = deepCopy(obj[key]);
+    }
+  }
+  return copied;
+};
 
 /**
  * Generates a random array with specified parameters
@@ -30,7 +46,7 @@ export const generateRandomArray = (size = 8, min = 1, max = 100) => {
  * @returns {Object} Step object
  */
 export const createStep = (array, highlightedIndices = {}, operationDescription = '', additionalProps = {}) => ({
-  array: deepCopy(array),
+  array: array, // Don't deep copy here since it's already copied in the algorithm
   highlightedIndices,
   operationDescription,
   ...additionalProps

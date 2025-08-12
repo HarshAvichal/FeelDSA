@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EnhancedSortingVisualizer from '../components/EnhancedSortingVisualizer';
-import { enhancedBubbleSort } from '../utils/algorithms/enhancedBubbleSort';
+import { bubbleSort } from '../utils/algorithms/sorting';
 import { getUniqueId } from '../utils/constants';
 
 // Reducer for managing state
@@ -80,6 +80,8 @@ const EnhancedBubbleSort = () => {
   const [showEducational, setShowEducational] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showControls, setShowControls] = useState(false); // New state for button toggle
+  const [originalArray, setOriginalArray] = useState([]); // Store the original unsorted array
   const navigate = useNavigate();
 
   const { 
@@ -124,6 +126,7 @@ const EnhancedBubbleSort = () => {
   useEffect(() => {
     const defaultArray = createArrayFromInput(inputs.customArray);
     dispatch({ type: 'SET_ARRAY_STATE', payload: defaultArray });
+    setOriginalArray(defaultArray); // Store the original array
   }, []);
 
   // Handle input changes
@@ -143,6 +146,7 @@ const EnhancedBubbleSort = () => {
         selectedDataset: datasetName,
         customArray: dataset.join(', ')
       }));
+      setOriginalArray(newArray); // Store the original array
     }
   };
 
@@ -154,6 +158,7 @@ const EnhancedBubbleSort = () => {
       return;
     }
     dispatch({ type: 'SET_ARRAY_STATE', payload: newArray });
+    setOriginalArray(newArray); // Store the original array
     // Show the new array in the visualizer as a single step
     const initialStep = {
       array: newArray,
@@ -176,6 +181,7 @@ const EnhancedBubbleSort = () => {
       selectedDataset: 'Random',
       customArray: newArray.map(item => item.value).join(', ')
     }));
+    setOriginalArray(newArray); // Store the original array
   };
 
   // Start bubble sort
@@ -184,33 +190,43 @@ const EnhancedBubbleSort = () => {
       alert('Please create an array first');
       return;
     }
-    const startTime = performance.now();
-    const steps = enhancedBubbleSort.steps(state.arrayState, settings);
-    const endTime = performance.now();
-    dispatch({ type: 'SET_TOTAL_STEPS', payload: steps.length });
-    dispatch({ type: 'SET_STEP', payload: { ...steps[0], stepIndex: 0 } });
+    
+    // Show control buttons and hide start button
+    setShowControls(true);
+    
+    // Set playing state to true since animation starts immediately
+    dispatch({ type: 'SET_PLAYING', payload: true });
+    dispatch({ type: 'SET_ANIMATING', payload: true });
+    
+    // Initialize metrics to 0
     dispatch({ 
       type: 'SET_PERFORMANCE_METRICS', 
       payload: {
         comparisons: 0,
         swaps: 0,
         passes: 0,
-        duration: Math.round(endTime - startTime)
+        duration: 0
       }
     });
+    
+    const steps = enhancedBubbleSort.steps(state.arrayState, settings);
+    dispatch({ type: 'SET_TOTAL_STEPS', payload: steps.length });
+    dispatch({ type: 'SET_STEP', payload: { ...steps[0], stepIndex: 0 } });
     window.bubbleSortSteps = steps;
   };
 
   // Animation controls
   const handlePlayPause = () => {
-    console.log('[DEBUG] handlePlayPause called. isPlaying before:', isPlaying);
     if (totalSteps <= 1) return;
     if (isPlaying) {
+      // Pause: Stop the animation
       dispatch({ type: 'SET_PLAYING', payload: false });
+      dispatch({ type: 'SET_ANIMATING', payload: false });
     } else {
+      // Resume: Continue the animation from current step
       dispatch({ type: 'SET_PLAYING', payload: true });
+      dispatch({ type: 'SET_ANIMATING', payload: true });
     }
-    console.log('[DEBUG] handlePlayPause finished. isPlaying after:', !isPlaying);
   };
 
   const playAnimation = () => {
@@ -237,74 +253,200 @@ const EnhancedBubbleSort = () => {
   };
 
   const handleReset = () => {
-    console.log('[DEBUG] handleReset called.');
-    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
+    // Stop any ongoing animation
     dispatch({ type: 'SET_PLAYING', payload: false });
-    if (window.bubbleSortSteps && window.bubbleSortSteps.length > 0) {
-      dispatch({ type: 'SET_STEP', payload: { ...window.bubbleSortSteps[0], stepIndex: 0 } });
+    dispatch({ type: 'SET_ANIMATING', payload: false });
+    
+    // Reset to initial array state (unsorted)
+    if (originalArray.length > 0) {
+      dispatch({ type: 'SET_ARRAY_STATE', payload: [...originalArray] });
     }
+    
+    // Reset step tracking
+    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
+    dispatch({ type: 'SET_TOTAL_STEPS', payload: 0 });
+    dispatch({ type: 'SET_STEP', payload: null });
+    
+    // Show start button again
+    setShowControls(false);
+    
+    // Reset performance metrics to 0
+    dispatch({
+      type: 'SET_PERFORMANCE_METRICS',
+      payload: {
+        comparisons: 0,
+        swaps: 0,
+        passes: 0,
+        duration: 0
+      }
+    });
   };
 
   const handlePrevious = () => {
-    console.log('[DEBUG] handlePrevious called.');
     if (stepIndex > 0) {
       const steps = window.bubbleSortSteps;
       if (steps && stepIndex - 1 >= 0) {
         const prevStep = steps[stepIndex - 1];
         dispatch({ type: 'SET_STEP', payload: { ...prevStep, stepIndex: stepIndex - 1 } });
         dispatch({ type: 'SET_STEP_INDEX', payload: stepIndex - 1 });
+        
+        // Recalculate metrics up to this step
+        recalculateMetricsUpToStep(stepIndex - 1);
+      }
+    }
+  };
+
+  // Helper function to recalculate metrics up to a specific step
+  const recalculateMetricsUpToStep = (stepIndex) => {
+    if (stepIndex < 0) return;
+    
+    const steps = window.bubbleSortSteps;
+    if (!steps || stepIndex >= steps.length) return;
+    
+    // Get metrics from the current step's metadata
+    const currentStep = steps[stepIndex];
+    if (currentStep.metadata) {
+      const { comparisons, swaps, pass } = currentStep.metadata;
+      
+      // Calculate realistic algorithm execution time
+      const baseTimePerComparison = 0.1;
+      const baseTimePerSwap = 0.5;
+      const algorithmExecutionTime = Math.round(
+        (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+      );
+      
+      // Update performance metrics with cumulative values
+      dispatch({
+        type: 'SET_PERFORMANCE_METRICS',
+        payload: {
+          comparisons: Math.max(comparisons || 0, performanceMetrics.comparisons || 0),
+          swaps: Math.max(swaps || 0, performanceMetrics.swaps || 0),
+          passes: Math.max(pass || 0, performanceMetrics.passes || 0),
+          duration: Math.max(1, algorithmExecutionTime)
+        }
+      });
+    } else {
+      // Try to get metrics directly from step object properties
+      const { comparisons, swaps, pass } = currentStep;
+      
+      if (comparisons !== undefined || swaps !== undefined || pass !== undefined) {
+        // Calculate realistic algorithm execution time
+        const baseTimePerComparison = 0.1;
+        const baseTimePerSwap = 0.5;
+        const algorithmExecutionTime = Math.round(
+          (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+        );
+        
+        // Update performance metrics with cumulative values
+        dispatch({
+          type: 'SET_PERFORMANCE_METRICS',
+          payload: {
+            comparisons: Math.max(comparisons || 0, performanceMetrics.comparisons || 0),
+            swaps: Math.max(swaps || 0, performanceMetrics.swaps || 0),
+            passes: Math.max(pass || 0, performanceMetrics.passes || 0),
+            duration: Math.max(1, algorithmExecutionTime)
+          }
+        });
       }
     }
   };
 
   const handleNext = () => {
-    console.log('[DEBUG] handleNext called.');
     if (stepIndex < totalSteps - 1) {
       const steps = window.bubbleSortSteps;
       if (steps && stepIndex + 1 < steps.length) {
         const nextStep = steps[stepIndex + 1];
         dispatch({ type: 'SET_STEP', payload: { ...nextStep, stepIndex: stepIndex + 1 } });
         dispatch({ type: 'SET_STEP_INDEX', payload: stepIndex + 1 });
+        
+        // Recalculate metrics up to this step
+        recalculateMetricsUpToStep(stepIndex + 1);
       }
     }
   };
 
   // Animation loop for Play button
   useEffect(() => {
-    console.log('[DEBUG] useEffect - isPlaying:', isPlaying, 'stepIndex:', stepIndex, 'totalSteps:', totalSteps, 'speed:', settings.speed);
     if (!isPlaying) return;
     if (stepIndex < totalSteps - 1) {
       const timer = setTimeout(() => {
-        console.log('[DEBUG] Advancing to next step:', stepIndex + 1);
+        // Update metrics dynamically based on the next step
+        const nextStepIndex = stepIndex + 1;
+        const steps = window.bubbleSortSteps;
+        if (steps && nextStepIndex < steps.length) {
+          const nextStep = steps[nextStepIndex];
+          
+          // Get metrics from the next step's metadata
+          if (nextStep.metadata) {
+            const { comparisons, swaps, pass } = nextStep.metadata;
+            
+            // Calculate realistic algorithm execution time
+            const baseTimePerComparison = 0.1; // 0.1ms per comparison
+            const baseTimePerSwap = 0.5; // 0.5ms per swap
+            const algorithmExecutionTime = Math.round(
+              (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+            );
+            
+            // Calculate new cumulative values
+            const newComparisons = Math.max(comparisons || 0, performanceMetrics.comparisons || 0);
+            const newSwaps = Math.max(swaps || 0, performanceMetrics.swaps || 0);
+            const newPasses = Math.max(pass || 0, performanceMetrics.passes || 0);
+            
+            // Update performance metrics in real-time with cumulative values
+            const newMetrics = {
+              comparisons: newComparisons,
+              swaps: newSwaps,
+              passes: newPasses,
+              duration: Math.max(1, algorithmExecutionTime)
+            };
+            
+            dispatch({
+              type: 'SET_PERFORMANCE_METRICS',
+              payload: newMetrics
+            });
+          } else {
+            // Try to get metrics directly from step object properties
+            const { comparisons, swaps, pass } = nextStep;
+            
+            if (comparisons !== undefined || swaps !== undefined || pass !== undefined) {
+              // Calculate realistic algorithm execution time
+              const baseTimePerComparison = 0.1; // 0.1ms per comparison
+              const baseTimePerSwap = 0.5; // 0.5ms per swap
+              const algorithmExecutionTime = Math.round(
+                (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+              );
+              
+              // Calculate new cumulative values
+              const newComparisons = Math.max(comparisons || 0, performanceMetrics.comparisons || 0);
+              const newSwaps = Math.max(swaps || 0, performanceMetrics.swaps || 0);
+              const newPasses = Math.max(pass || 0, performanceMetrics.passes || 0);
+              
+              // Update performance metrics in real-time with cumulative values
+              const newMetrics = {
+                comparisons: newComparisons,
+                swaps: newSwaps,
+                passes: newPasses,
+                duration: Math.max(1, algorithmExecutionTime)
+              };
+              
+              dispatch({
+                type: 'SET_PERFORMANCE_METRICS',
+                payload: newMetrics
+              });
+            }
+          }
+        }
+        
         handleNext();
       }, speedSettings[settings.speed]);
       return () => clearTimeout(timer);
     } else {
-      console.log('[DEBUG] Animation finished. Stopping play.');
       dispatch({ type: 'SET_PLAYING', payload: false });
+      dispatch({ type: 'SET_ANIMATING', payload: false });
+      // Hide control buttons and show start button again
+      setShowControls(false);
     }
   }, [isPlaying, stepIndex, totalSteps, settings.speed]);
-
-  // Debug log for step changes
-  useEffect(() => {
-    console.log('[DEBUG] Step changed:', stepIndex, 'Current step:', state.currentStep);
-  }, [stepIndex, state.currentStep]);
-
-  // Update performance metrics from currentStep.metadata
-  useEffect(() => {
-    if (state.currentStep && state.currentStep.metadata) {
-      console.log('[DEBUG] Step metadata:', state.currentStep.metadata);
-      dispatch({
-        type: 'SET_PERFORMANCE_METRICS',
-        payload: {
-          comparisons: state.currentStep.metadata.comparisons || 0,
-          swaps: state.currentStep.metadata.swaps || 0,
-          passes: state.currentStep.metadata.pass || 0,
-          duration: state.performanceMetrics.duration
-        }
-      });
-    }
-  }, [state.currentStep]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -522,45 +664,27 @@ const EnhancedBubbleSort = () => {
           </div>
           {/* Right Column - Visualization */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Start Button */}
-            <div className="card w-full">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
-                <div className="w-full sm:w-auto text-center sm:text-left">
-                  <h3 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2">Ready to Sort?</h3>
-                  <p className="text-sm text-gray-600">
-                    Click "Start Bubble Sort" to begin the visualization
-                  </p>
+            {/* Start Button or Controls */}
+            {!showControls ? (
+              <div className="card w-full">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
+                  <div className="w-full sm:w-auto text-center sm:text-left">
+                    <h3 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2">Ready to Sort?</h3>
+                    <p className="text-sm text-gray-600">
+                      Click "Start Bubble Sort" to begin the visualization
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleStartSort}
+                    className="btn btn-primary w-full sm:w-auto"
+                    disabled={isAnimating || arrayState.length === 0}
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Start Bubble Sort
+                  </button>
                 </div>
-                <button
-                  onClick={handleStartSort}
-                  className="btn btn-primary w-full sm:w-auto"
-                  disabled={isAnimating || arrayState.length === 0}
-                >
-                  <Play className="w-4 h-4 mr-2" />
-                  Start Bubble Sort
-                </button>
               </div>
-            </div>
-            {/* Enhanced Visualizer */}
-            {totalSteps > 0 && (
-              <EnhancedSortingVisualizer
-                topic="Bubble Sort"
-                arrayState={arrayState}
-                currentStep={currentStep}
-                totalSteps={totalSteps}
-                isPlaying={isPlaying}
-                onPlayPause={handlePlayPause}
-                onReset={handleReset}
-                onPrevious={handlePrevious}
-                onNext={handleNext}
-                performanceMetrics={performanceMetrics}
-                viewMode={settings.viewMode}
-                comparisonData={enhancedBubbleSort.comparisonData}
-                onViewModeChange={(newViewMode) => setSettings(prev => ({ ...prev, viewMode: newViewMode }))}
-              />
-            )}
-            {/* Controls */}
-            {totalSteps > 1 && (
+            ) : (
               <div className="card w-full">
                 <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Controls</h3>
                 <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
@@ -600,6 +724,24 @@ const EnhancedBubbleSort = () => {
                   </div>
                 </div>
               </div>
+            )}
+            {/* Enhanced Visualizer */}
+            {totalSteps > 0 && (
+              <EnhancedSortingVisualizer
+                topic="Bubble Sort"
+                arrayState={arrayState}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                isPlaying={isPlaying}
+                onPlayPause={handlePlayPause}
+                onReset={handleReset}
+                onPrevious={handlePrevious}
+                onNext={handleNext}
+                performanceMetrics={performanceMetrics}
+                viewMode={settings.viewMode}
+                comparisonData={enhancedBubbleSort.comparisonData}
+                onViewModeChange={(newViewMode) => setSettings(prev => ({ ...prev, viewMode: newViewMode }))}
+              />
             )}
             {/* Code Display */}
             {operationDetails && (

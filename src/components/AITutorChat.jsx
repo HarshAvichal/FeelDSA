@@ -42,11 +42,11 @@ const AITutorChat = () => {
 
     try {
       const context = {
-        currentTopic,
-        stepIndex,
-        arrayState,
-        highlightedIndex,
-        operationDescription
+        currentTopic: currentTopic || 'General DSA',
+        stepIndex: stepIndex || 0,
+        arrayState: arrayState || [],
+        highlightedIndex: highlightedIndex || -1,
+        operationDescription: operationDescription || 'No specific operation'
       }
       
       const response = await fetch('/api/tutor', {
@@ -58,7 +58,8 @@ const AITutorChat = () => {
       });
 
       if (!response.ok) {
-        throw new Error('The response from the server was not OK.');
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -71,14 +72,34 @@ const AITutorChat = () => {
       }
 
       setMessages(prev => [...prev, aiMessage])
+      
+      // Log successful responses for debugging
+      if (data.usage) {
+
+      }
+      
     } catch (error) {
       console.error('Error getting AI response:', error)
-      const errorMessage = {
+      
+      let errorMessage = "I'm sorry, I'm having trouble connecting right now. Please check your internet connection and try again.";
+      
+      // Provide more specific error messages
+      if (error.message.includes('OpenAI API key')) {
+        errorMessage = "The AI tutor is not properly configured. Please contact support.";
+      } else if (error.message.includes('quota exceeded')) {
+        errorMessage = "The AI tutor has reached its usage limit. Please try again later.";
+      } else if (error.message.includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a moment and try again.";
+      } else if (error.message.includes('timeout')) {
+        errorMessage = "The request took too long. Please try again.";
+      }
+      
+      const errorMessageObj = {
         id: Date.now() + 1,
         type: 'ai',
-        content: "I'm sorry, I'm having trouble connecting right now. Please check your internet connection and try again."
+        content: errorMessage
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => [...prev, errorMessageObj])
     } finally {
       setIsLoading(false)
     }

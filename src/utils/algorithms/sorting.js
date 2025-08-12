@@ -1,3 +1,9 @@
+/**
+ * Sorting Algorithms
+ * This file contains implementations of various sorting algorithms
+ * with step-by-step visualization support.
+ */
+
 import { deepCopy, createStep } from '../helpers.js';
 
 /**
@@ -7,46 +13,145 @@ import { deepCopy, createStep } from '../helpers.js';
  */
 export const bubbleSort = {
   name: 'Bubble Sort',
-  description: 'A simple sorting algorithm that repeatedly steps through the list, compares adjacent elements and swaps them if they are in the wrong order.',
+  description: 'A simple sorting algorithm that repeatedly steps through the list, compares adjacent elements and swaps them if they are in the wrong order. The largest elements "bubble up" to their correct positions.',
   complexity: {
     time: 'O(n²)',
-    space: 'O(1)'
+    space: 'O(1)',
+    best: 'O(n)',
+    average: 'O(n²)',
+    worst: 'O(n²)'
   },
-  code: `// Bubble Sort in C++
+  explanation: {
+    overview: 'Bubble Sort works by repeatedly stepping through the list, comparing adjacent elements and swapping them if they are in the wrong order. The pass through the list is repeated until no swaps are needed.',
+    howItWorks: [
+      'Start from the first element and compare it with the next element',
+      'If the first element is greater than the second, swap them',
+      'Move to the next pair and repeat the comparison',
+      'After the first pass, the largest element will be in the last position',
+      'Repeat the process for the remaining elements (excluding the last sorted element)',
+      'Continue until no more swaps are needed'
+    ],
+    advantages: [
+      'Simple to understand and implement',
+      'Stable sorting algorithm',
+      'In-place sorting (no extra memory needed)',
+      'Good for small datasets or nearly sorted data'
+    ],
+    disadvantages: [
+      'Very inefficient for large datasets',
+      'Time complexity of O(n²) makes it impractical for large lists',
+      'Many unnecessary comparisons and swaps'
+    ],
+    optimizations: [
+      'Early termination: Stop if no swaps occur in a pass',
+      'Track the last swap position to reduce unnecessary comparisons',
+      'Use a flag to detect if the array is already sorted'
+    ]
+  },
+  code: `// Enhanced Bubble Sort in C++ with optimizations
 void bubbleSort(int arr[], int n) {
+  bool swapped;
+  int lastUnsorted = n - 1;
+  
   for (int i = 0; i < n - 1; i++) {
-    for (int j = 0; j < n - i - 1; j++) {
+    swapped = false;
+    
+    for (int j = 0; j < lastUnsorted; j++) {
+      // Compare adjacent elements
       if (arr[j] > arr[j + 1]) {
+        // Swap if they are in wrong order
         int temp = arr[j];
         arr[j] = arr[j + 1];
         arr[j + 1] = temp;
+        swapped = true;
       }
     }
+    
+    // If no swapping occurred, array is sorted
+    if (!swapped) {
+      break;
+    }
+    
+    // Reduce the range for next pass
+    lastUnsorted--;
   }
-}
-`,
+}`,
+  // Predefined datasets for demonstration
+  predefinedDatasets: {
+    'Random': [8, 3, 15, 6, 12, 1, 9, 4],
+    'Nearly Sorted': [1, 2, 4, 3, 5, 6, 8, 7],
+    'Reversed': [8, 7, 6, 5, 4, 3, 2, 1],
+    'Duplicates': [3, 1, 4, 1, 5, 9, 2, 6],
+    'Small': [5, 2, 8, 1, 9],
+    'Large': [23, 45, 12, 67, 89, 34, 56, 78, 90, 123, 45, 67, 89, 12, 34, 56, 78, 90, 123, 45]
+  },
+
+  // Comparison data for educational purposes
+  comparisonData: {
+    'Bubble Sort': { time: 'O(n²)', space: 'O(1)', stability: 'Stable' },
+    'Selection Sort': { time: 'O(n²)', space: 'O(1)', stability: 'Unstable' },
+    'Insertion Sort': { time: 'O(n²)', space: 'O(1)', stability: 'Stable' },
+    'Merge Sort': { time: 'O(n log n)', space: 'O(n)', stability: 'Stable' },
+    'Quick Sort': { time: 'O(n log n)', space: 'O(log n)', stability: 'Unstable' }
+  },
+
   steps: (array) => {
     const steps = [];
     const arr = deepCopy(array);
     const n = arr.length;
+    let totalComparisons = 0;
+    let totalSwaps = 0;
+    let totalPasses = 0;
     
     for (let i = 0; i < n - 1; i++) {
+      totalPasses++;
+      let swapped = false;
+      
       for (let j = 0; j < n - i - 1; j++) {
+        totalComparisons++;
+        
         steps.push(createStep(
-          arr,
-          { primary: [j, j + 1] },
-          `Comparing arr[${j}] (${arr[j].value}) and arr[${j + 1}] (${arr[j + 1].value})`
+          deepCopy(arr),
+          { primary: [j], secondary: [j + 1] },
+          `Comparing ${arr[j].value} with ${arr[j + 1].value}`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
         ));
         
         if (arr[j].value > arr[j + 1].value) {
           // Swap elements
           [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+          totalSwaps++;
+          swapped = true;
+          
           steps.push(createStep(
-            arr,
-            { primary: [j, j + 1], success: [j, j + 1] },
-            `Swapped. New order for these two: [${arr[j].value}, ${arr[j + 1].value}]`
+            deepCopy(arr),
+            { success: [j, j + 1] },
+            `Swapped ${arr[j].value} and ${arr[j + 1].value}`,
+            {
+              pass: totalPasses,
+              comparisons: totalComparisons,
+              swaps: totalSwaps
+            }
           ));
         }
+      }
+      
+      if (!swapped) {
+        steps.push(createStep(
+          deepCopy(arr),
+          { success: Array.from({length: n}, (_, i) => i) },
+          `No swaps in this pass - array is sorted!`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
+        ));
+        break;
       }
     }
     
@@ -61,93 +166,102 @@ void bubbleSort(int arr[], int n) {
  */
 export const selectionSort = {
   name: 'Selection Sort',
-  description: 'An in-place comparison sorting algorithm that divides the input list into two parts: a sorted sublist and an unsorted sublist.',
+  description: 'A simple sorting algorithm that divides the input list into two parts: a sorted sublist of items which is built up from left to right and a sublist of the remaining unsorted items.',
   complexity: {
     time: 'O(n²)',
     space: 'O(1)'
   },
-  
-  // Educational content
-  explanation: {
-    overview: 'Selection Sort works by dividing the array into a sorted and unsorted region. It repeatedly selects the smallest element from the unsorted region and places it at the end of the sorted region.',
-    howItWorks: [
-      'Start with an empty sorted region and the entire array as unsorted',
-      'Find the smallest element in the unsorted region',
-      'Swap this smallest element with the first element of the unsorted region',
-      'Move the boundary between sorted and unsorted regions one element to the right',
-      'Repeat the process until the unsorted region becomes empty',
-      'The array is now sorted in ascending order'
-    ],
-    advantages: [
-      'Simple to understand and implement',
-      'Performs well on small lists',
-      'Minimal memory usage (in-place sorting)',
-      'Number of swaps is O(n) - fewer swaps than Bubble Sort'
-    ],
-    disadvantages: [
-      'Inefficient for large datasets due to O(n²) time complexity',
-      'Not adaptive - performance doesn\'t improve on nearly sorted data',
-      'Poor performance compared to more advanced algorithms',
-      'Always performs the same number of comparisons regardless of data'
-    ],
-    optimizations: [
-      'Can be modified to find both minimum and maximum in each pass',
-      'Use of sentinel values can reduce some comparisons',
-      'Early termination possible if array becomes sorted'
-    ]
-  },
-  
   code: `// Selection Sort in C++
 void selectionSort(int arr[], int n) {
-  for (int i = 0; i < n - 1; i++) {
-    int minIdx = i;
-    for (int j = i + 1; j < n; j++) {
-      if (arr[j] < arr[minIdx]) {
-        minIdx = j;
+  for (int i = 0; i < n-1; i++) {
+    int min_idx = i;
+    for (int j = i+1; j < n; j++) {
+      if (arr[j] < arr[min_idx]) {
+        min_idx = j;
       }
     }
-    int temp = arr[i];
-    arr[i] = arr[minIdx];
-    arr[minIdx] = temp;
+    int temp = arr[min_idx];
+    arr[min_idx] = arr[i];
+    arr[i] = temp;
   }
 }`,
   steps: (array) => {
     const steps = [];
     const arr = deepCopy(array);
     const n = arr.length;
+    let totalComparisons = 0;
+    let totalSwaps = 0;
+    let totalPasses = 0;
     
     for (let i = 0; i < n - 1; i++) {
+      totalPasses++;
       let minIndex = i;
       
       steps.push(createStep(
-        arr,
+        deepCopy(arr),
         { primary: [i] },
-        `Finding minimum element starting from index ${i}`
+        `Starting pass ${totalPasses}: looking for minimum element from position ${i}`,
+        {
+          pass: totalPasses,
+          comparisons: totalComparisons,
+          swaps: totalSwaps
+        }
       ));
       
       for (let j = i + 1; j < n; j++) {
+        totalComparisons++;
+        
         steps.push(createStep(
-          arr,
-          { primary: [j], secondary: [minIndex] },
-          `Comparing arr[${j}] (${arr[j].value}) with current minimum arr[${minIndex}] (${arr[minIndex].value})`
+          deepCopy(arr),
+          { primary: [minIndex], secondary: [j] },
+          `Comparing ${arr[minIndex].value} with ${arr[j].value}`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
         ));
         
         if (arr[j].value < arr[minIndex].value) {
           minIndex = j;
+          
           steps.push(createStep(
-            arr,
-            { primary: [j] },
-            `New minimum found: arr[${j}] (${arr[j].value})`
+            deepCopy(arr),
+            { primary: [minIndex], secondary: [j] },
+            `New minimum found: ${arr[minIndex].value} at position ${minIndex}`,
+            {
+              pass: totalPasses,
+              comparisons: totalComparisons,
+              swaps: totalSwaps
+            }
           ));
         }
       }
       
       if (minIndex !== i) {
         [arr[i], arr[minIndex]] = [arr[minIndex], arr[i]];
+        totalSwaps++;
+        
         steps.push(createStep(
-          arr,
+          deepCopy(arr),
+          { success: [i, minIndex] },
+          `Swapped ${arr[i].value} with ${arr[minIndex].value}`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
+        ));
+      } else {
+        steps.push(createStep(
+          deepCopy(arr),
           { success: [i] },
-          `Swapped. Element ${arr[i].value} is now in correct position.`
+          `No swap needed - ${arr[i].value} is already in correct position`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
         ));
       }
     }
@@ -163,43 +277,11 @@ void selectionSort(int arr[], int n) {
  */
 export const insertionSort = {
   name: 'Insertion Sort',
-  description: 'A simple sorting algorithm that builds the final sorted array one item at a time by repeatedly inserting a new element into the sorted portion of the array.',
+  description: 'A simple sorting algorithm that builds the final sorted array one item at a time. It is much less efficient on large lists than more advanced algorithms such as quicksort, heapsort, or merge sort.',
   complexity: {
     time: 'O(n²)',
     space: 'O(1)'
   },
-  
-  // Educational content
-  explanation: {
-    overview: 'Insertion Sort works by building the final sorted array one element at a time. It takes each element from the unsorted portion and inserts it into its correct position in the sorted portion.',
-    howItWorks: [
-      'Start with the first element as the sorted portion',
-      'Take the next element from the unsorted portion',
-      'Compare it with elements in the sorted portion from right to left',
-      'Shift larger elements to the right to make space',
-      'Insert the current element in its correct position',
-      'Repeat until all elements are in the sorted portion'
-    ],
-    advantages: [
-      'Simple to understand and implement',
-      'Efficient for small data sets',
-      'Adaptive - performs well on nearly sorted data',
-      'Stable sorting algorithm',
-      'In-place sorting with O(1) space complexity'
-    ],
-    disadvantages: [
-      'Inefficient for large datasets due to O(n²) time complexity',
-      'Poor performance on reverse-sorted data',
-      'Many element shifts required',
-      'Not suitable for linked lists due to random access requirement'
-    ],
-    optimizations: [
-      'Binary search can reduce comparisons in the insertion step',
-      'Use of sentinel values can simplify boundary checking',
-      'Early termination when element is already in correct position'
-    ]
-  },
-  
   code: `// Insertion Sort in C++
 void insertionSort(int arr[], int n) {
   for (int i = 1; i < n; i++) {
@@ -216,33 +298,100 @@ void insertionSort(int arr[], int n) {
     const steps = [];
     const arr = deepCopy(array);
     const n = arr.length;
+    let totalComparisons = 0;
+    let totalSwaps = 0;
+    let totalPasses = 0;
+    
+    // Add initial state
+    steps.push(createStep(
+      deepCopy(arr),
+      {},
+      `Starting Insertion Sort with ${n} elements`,
+      {
+        pass: 0,
+        comparisons: 0,
+        swaps: 0
+      }
+    ));
     
     for (let i = 1; i < n; i++) {
-      const key = deepCopy(arr[i]); // Deep copy to avoid reference issues
+      totalPasses++;
+      const key = arr[i];
       let j = i - 1;
       
+      // Show the key element being considered
       steps.push(createStep(
-        arr,
+        deepCopy(arr),
         { primary: [i] },
-        `Selecting element ${key.value} to insert into sorted portion`
+        `Considering element ${key.value} at position ${i}`,
+        {
+          pass: totalPasses,
+          comparisons: totalComparisons,
+          swaps: totalSwaps
+        }
       ));
       
+      // Shift elements to the right while key is smaller
       while (j >= 0 && arr[j].value > key.value) {
+        totalComparisons++;
+        
+        // Show the comparison
         steps.push(createStep(
-          arr,
-          { primary: [j + 1], secondary: [j] },
-          `Shifting ${arr[j].value} to the right since ${arr[j].value} > ${key.value}`
+          deepCopy(arr),
+          { primary: [i], secondary: [j] },
+          `Comparing ${arr[j].value} > ${key.value} - shifting ${arr[j].value} right`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
         ));
+        
+        // Shift element to the right
         arr[j + 1] = arr[j];
         j--;
+        
+        // Show the shift
+        steps.push(createStep(
+          deepCopy(arr),
+          { primary: [i], secondary: [j + 1] },
+          `Shifted ${arr[j + 1].value} to position ${j + 1}`,
+          {
+            pass: totalPasses,
+            comparisons: totalComparisons,
+            swaps: totalSwaps
+          }
+        ));
       }
+      
+      // Insert the key at the correct position
       arr[j + 1] = key;
+      totalSwaps++;
+      
+      // Show the insertion
       steps.push(createStep(
-        arr,
+        deepCopy(arr),
         { success: [j + 1] },
-        `Inserted ${key.value} at position ${j + 1}.`
+        `Inserted ${key.value} at position ${j + 1}`,
+        {
+          pass: totalPasses,
+          comparisons: totalComparisons,
+          swaps: totalSwaps
+        }
       ));
     }
+    
+    // Add final sorted state
+    steps.push(createStep(
+      deepCopy(arr),
+      { success: Array.from({length: n}, (_, i) => i) },
+      `Insertion Sort Complete! Array is now sorted in ascending order`,
+      {
+        pass: totalPasses,
+        comparisons: totalComparisons,
+        swaps: totalSwaps
+      }
+    ));
     
     return steps;
   }
@@ -287,8 +436,7 @@ void mergeSort(int arr[], int l, int r) {
     mergeSort(arr, m + 1, r);
     merge(arr, l, m, r);
   }
-}
-`,
+}`,
   steps: (array) => {
     const steps = [];
     const arr = deepCopy(array);
@@ -404,12 +552,11 @@ int partition(int arr[], int low, int high) {
 }
 void quickSort(int arr[], int low, int high) {
   if (low < high) {
-    int pi = partition(arr, low, high);
+    int pi = partition(low, high);
     quickSort(arr, low, pi - 1);
     quickSort(arr, pi + 1, high);
   }
-}
-`,
+}`,
   steps: (array) => {
     const steps = [];
     const arr = deepCopy(array);
@@ -479,4 +626,4 @@ void quickSort(int arr[], int low, int high) {
     
     return steps;
   }
-}; 
+};

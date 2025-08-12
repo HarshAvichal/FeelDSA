@@ -34,5 +34,32 @@ export const algorithms = {
     difficulty: 'Medium',
     isProblemCategory: true,
     problems: binarySearchProblems
+  },
+  'Array Problems': {
+    name: 'Array Problems',
+    description: 'Common array manipulation and problem-solving challenges',
+    complexity: 'O(n) to O(n²)',
+    category: 'Problem Variations',
+    difficulty: 'Easy to Medium',
+    isProblemCategory: true,
+    problems: []
+  },
+  'String Problems': {
+    name: 'String Problems',
+    description: 'String manipulation and pattern matching challenges',
+    complexity: 'O(n) to O(n²)',
+    category: 'Problem Variations',
+    difficulty: 'Easy to Medium',
+    isProblemCategory: true,
+    problems: []
+  },
+  'Tree Problems': {
+    name: 'Tree Problems',
+    description: 'Binary tree traversal and manipulation challenges',
+    complexity: 'O(n) to O(h)',
+    category: 'Problem Variations',
+    difficulty: 'Medium to Hard',
+    isProblemCategory: true,
+    problems: []
   }
 }; 

@@ -72,6 +72,8 @@ const EnhancedInsertionSort = () => {
   const [viewMode, setViewMode] = useState('array');
   const [showLearnSection, setShowLearnSection] = useState(false);
   const [showCodeSection, setShowCodeSection] = useState(false);
+  const [showControls, setShowControls] = useState(false); // New state for button toggle
+  const [originalArray, setOriginalArray] = useState([]); // Store the original unsorted array
   
   const {
     arrayState,
@@ -91,6 +93,13 @@ const EnhancedInsertionSort = () => {
     showOptimization: true
   });
 
+  // Speed settings
+  const speedSettings = {
+    'Slow (2s)': 2000,
+    'Normal (1s)': 1000,
+    'Fast (0.5s)': 500
+  };
+
   // Predefined datasets
   const predefinedDatasets = {
     'Random': [8, 3, 15, 6, 12, 1, 9, 4],
@@ -99,6 +108,16 @@ const EnhancedInsertionSort = () => {
     'Duplicates': [3, 1, 4, 1, 5, 9, 2, 6],
     'Small Range': [1, 2, 1, 2, 1, 2, 1, 2]
   };
+
+  // Initialize array on component mount
+  useEffect(() => {
+    const initialArray = predefinedDatasets['Random'].map(value => ({
+      id: getUniqueId(),
+      value: value
+    }));
+    dispatch({ type: 'SET_ARRAY_STATE', payload: initialArray });
+    setOriginalArray([...initialArray]);
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -117,6 +136,7 @@ const EnhancedInsertionSort = () => {
         value: value
       }));
       dispatch({ type: 'SET_ARRAY_STATE', payload: arrayWithIds });
+      setOriginalArray([...arrayWithIds]); // Store the original array
     }
   };
 
@@ -129,6 +149,7 @@ const EnhancedInsertionSort = () => {
           value: value
         }));
         dispatch({ type: 'SET_ARRAY_STATE', payload: arrayWithIds });
+        setOriginalArray([...arrayWithIds]); // Store the original array
         setInputs(prev => ({ ...prev, selectedDataset: 'Custom' }));
       }
     }
@@ -141,109 +162,249 @@ const EnhancedInsertionSort = () => {
       value: value
     }));
     dispatch({ type: 'SET_ARRAY_STATE', payload: arrayWithIds });
+    setOriginalArray([...arrayWithIds]); // Store the original array
     setInputs(prev => ({ ...prev, selectedDataset: 'Random' }));
   };
 
   const handleStartSort = () => {
     if (arrayState.length === 0) return;
     
+    // Show control buttons and hide start button
+    setShowControls(true);
+    
+    // Set playing state to true since animation starts immediately
+    dispatch({ type: 'SET_PLAYING', payload: true });
     dispatch({ type: 'SET_ANIMATING', payload: true });
-    const startTime = performance.now();
+    
+    // Initialize metrics to 0
+    dispatch({ 
+      type: 'SET_PERFORMANCE_METRICS', 
+      payload: {
+        comparisons: 0,
+        swaps: 0,
+        passes: 0,
+        duration: 0
+      }
+    });
     
     // Generate steps for insertion sort
     const steps = insertionSort.steps(arrayState);
     dispatch({ type: 'SET_TOTAL_STEPS', payload: steps.length });
-    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
-    
-    // Calculate performance metrics
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    
-    // Count comparisons and swaps from steps
-    let comparisons = 0;
-    let swaps = 0;
-    steps.forEach(step => {
-      if (step.highlightedIndices?.primary) {
-        comparisons++;
-      }
-      if (step.highlightedIndices?.success) {
-        swaps++;
-      }
-    });
-    
-    dispatch({
-      type: 'SET_PERFORMANCE_METRICS',
-      payload: {
-        comparisons,
-        swaps,
-        passes: Math.ceil(steps.length / arrayState.length),
-        duration: Math.round(duration)
-      }
-    });
-    
-    // Start animation
-    let currentStepIndex = 0;
-    const animateSteps = () => {
-      if (currentStepIndex < steps.length) {
-        dispatch({ type: 'SET_STEP', payload: steps[currentStepIndex] });
-        dispatch({ type: 'SET_STEP_INDEX', payload: currentStepIndex });
-        currentStepIndex++;
-        
-        const speed = inputs.animationSpeed === 'Fast (0.5s)' ? 500 : 
-                     inputs.animationSpeed === 'Slow (2s)' ? 2000 : 1000;
-        
-        setTimeout(animateSteps, speed);
-      } else {
-        dispatch({ type: 'SET_ANIMATING', payload: false });
-        dispatch({ type: 'SET_PLAYING', payload: false });
-      }
-    };
-    
-    animateSteps();
+    dispatch({ type: 'SET_STEP', payload: { ...steps[0], stepIndex: 0 } });
+    window.insertionSortSteps = steps;
   };
 
   const handlePlayPause = () => {
     if (totalSteps <= 1) return;
-    dispatch({ type: 'SET_PLAYING', payload: !isPlaying });
+    
+    if (isPlaying) {
+      // Pause: Stop the animation
+      dispatch({ type: 'SET_PLAYING', payload: false });
+      dispatch({ type: 'SET_ANIMATING', payload: false });
+    } else {
+      // Resume: Continue the animation from current step
+      dispatch({ type: 'SET_PLAYING', payload: true });
+      dispatch({ type: 'SET_ANIMATING', payload: true });
+    }
   };
 
-  const handleReset = () => {
-    dispatch({ type: 'SET_PLAYING', payload: false });
-    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
-    if (currentStep) {
-      dispatch({ type: 'SET_STEP', payload: currentStep });
+  // Animation loop for Play button
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (stepIndex < totalSteps - 1) {
+      const timer = setTimeout(() => {
+        // Update metrics dynamically based on the next step
+        const nextStepIndex = stepIndex + 1;
+        const steps = window.insertionSortSteps;
+        if (steps && nextStepIndex < steps.length) {
+          const nextStep = steps[nextStepIndex];
+          
+          // Get metrics from the next step's metadata
+          if (nextStep.metadata) {
+            const { comparisons, swaps, pass } = nextStep.metadata;
+            
+            // Calculate realistic algorithm execution time
+            const baseTimePerComparison = 0.1; // 0.1ms per comparison
+            const baseTimePerSwap = 0.5; // 0.5ms per swap
+            const algorithmExecutionTime = Math.round(
+              (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+            );
+            
+            // Calculate new cumulative values
+            const newComparisons = Math.max(comparisons || 0, performanceMetrics.comparisons || 0);
+            const newSwaps = Math.max(swaps || 0, performanceMetrics.swaps || 0);
+            const newPasses = Math.max(pass || 0, performanceMetrics.passes || 0);
+            
+            // Update performance metrics in real-time with cumulative values
+            const newMetrics = {
+              comparisons: newComparisons,
+              swaps: newSwaps,
+              passes: newPasses,
+              duration: Math.max(1, algorithmExecutionTime)
+            };
+            
+            dispatch({
+              type: 'SET_PERFORMANCE_METRICS',
+              payload: newMetrics
+            });
+          } else {
+            // Try to get metrics directly from step object properties
+            const { comparisons, swaps, pass } = nextStep;
+            
+            if (comparisons !== undefined || swaps !== undefined || pass !== undefined) {
+              // Calculate realistic algorithm execution time
+              const baseTimePerComparison = 0.1; // 0.1ms per comparison
+              const baseTimePerSwap = 0.5; // 0.5ms per swap
+              const algorithmExecutionTime = Math.round(
+                (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+              );
+              
+              // Calculate new cumulative values
+              const newComparisons = Math.max(comparisons || 0, performanceMetrics.comparisons || 0);
+              const newSwaps = Math.max(swaps || 0, performanceMetrics.swaps || 0);
+              const newPasses = Math.max(pass || 0, performanceMetrics.passes || 0);
+              
+              // Update performance metrics in real-time with cumulative values
+              const newMetrics = {
+                comparisons: newComparisons,
+                swaps: newSwaps,
+                passes: newPasses,
+                duration: Math.max(1, algorithmExecutionTime)
+              };
+              
+              dispatch({
+                type: 'SET_PERFORMANCE_METRICS',
+                payload: newMetrics
+              });
+            }
+          }
+        }
+        
+        handleNext();
+      }, speedSettings[inputs.animationSpeed]);
+      return () => clearTimeout(timer);
+    } else {
+      dispatch({ type: 'SET_PLAYING', payload: false });
+      dispatch({ type: 'SET_ANIMATING', payload: false });
+      // Hide control buttons and show start button again
+      setShowControls(false);
     }
+  }, [isPlaying, stepIndex, totalSteps, inputs.animationSpeed]);
+
+  const handleReset = () => {
+    // Stop any ongoing animation
+    dispatch({ type: 'SET_PLAYING', payload: false });
+    dispatch({ type: 'SET_ANIMATING', payload: false });
+    
+    // Reset to initial array state (unsorted)
+    if (originalArray.length > 0) {
+      dispatch({ type: 'SET_ARRAY_STATE', payload: [...originalArray] });
+    }
+    
+    // Reset step tracking
+    dispatch({ type: 'SET_STEP_INDEX', payload: 0 });
+    dispatch({ type: 'SET_TOTAL_STEPS', payload: 0 });
+    dispatch({ type: 'SET_STEP', payload: null });
+    
+    // Show start button again
+    setShowControls(false);
+    
+    // Reset performance metrics to 0
+    dispatch({
+      type: 'SET_PERFORMANCE_METRICS',
+      payload: {
+        comparisons: 0,
+        swaps: 0,
+        passes: 0,
+        duration: 0
+      }
+    });
   };
 
   const handleNext = () => {
     if (stepIndex < totalSteps - 1) {
-      dispatch({ type: 'SET_STEP_INDEX', payload: stepIndex + 1 });
+      const nextStepIndex = stepIndex + 1;
+      dispatch({ type: 'SET_STEP_INDEX', payload: nextStepIndex });
+      
+      // Recalculate metrics up to this step
+      recalculateMetricsUpToStep(nextStepIndex);
     }
   };
 
   const handlePrevious = () => {
     if (stepIndex > 0) {
-      dispatch({ type: 'SET_STEP_INDEX', payload: stepIndex - 1 });
+      const prevStepIndex = stepIndex - 1;
+      dispatch({ type: 'SET_STEP_INDEX', payload: prevStepIndex });
+      
+      // Recalculate metrics up to this step
+      recalculateMetricsUpToStep(prevStepIndex);
     }
+  };
+
+  // Helper function to recalculate metrics up to a specific step
+  const recalculateMetricsUpToStep = (stepIndex) => {
+    if (stepIndex < 0) return;
+    
+    // Get the stored steps instead of regenerating them
+    const steps = window.insertionSortSteps;
+    if (!steps || stepIndex >= steps.length) return;
+    
+    const currentStep = steps[stepIndex];
+    
+    // Get metrics from the current step's metadata
+    if (currentStep.metadata) {
+      const { comparisons, swaps, pass } = currentStep.metadata;
+      
+      // Calculate realistic algorithm execution time
+      const baseTimePerComparison = 0.1;
+      const baseTimePerSwap = 0.5;
+      const algorithmExecutionTime = Math.round(
+        (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+      );
+      
+      // Update performance metrics
+      dispatch({
+        type: 'SET_PERFORMANCE_METRICS',
+        payload: {
+          comparisons: comparisons || 0,
+          swaps: swaps || 0,
+          passes: pass || 0,
+          duration: Math.max(1, algorithmExecutionTime)
+        }
+      });
+    } else {
+      // Try to get metrics directly from step object properties
+      const { comparisons, swaps, pass } = currentStep;
+      
+      if (comparisons !== undefined || swaps !== undefined || pass !== undefined) {
+        // Calculate realistic algorithm execution time
+        const baseTimePerComparison = 0.1;
+        const baseTimePerSwap = 0.5;
+        const algorithmExecutionTime = Math.round(
+          (comparisons * baseTimePerComparison) + (swaps * baseTimePerSwap)
+        );
+        
+        // Update performance metrics
+        dispatch({
+          type: 'SET_PERFORMANCE_METRICS',
+          payload: {
+            comparisons: comparisons || 0,
+            swaps: swaps || 0,
+            passes: pass || 0,
+            duration: Math.max(1, algorithmExecutionTime)
+          }
+        });
+      }
+    }
+    
+    // Update the current step with the correct stepIndex
+    const updatedCurrentStep = { ...currentStep, stepIndex: stepIndex };
+    dispatch({ type: 'SET_STEP', payload: updatedCurrentStep });
   };
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
   };
-
-  // Auto-play functionality
-  useEffect(() => {
-    if (!isPlaying || isAnimating) return;
-
-    if (stepIndex < totalSteps - 1) {
-      const timer = setTimeout(() => {
-        handleNext();
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else {
-      dispatch({ type: 'SET_PLAYING', payload: false });
-    }
-  }, [isPlaying, stepIndex, totalSteps, isAnimating]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -499,21 +660,63 @@ const EnhancedInsertionSort = () => {
 
           {/* Right Column - Visualization */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Ready to Sort */}
-            <div className="card w-full">
-              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Ready to Sort?</h3>
-              <p className="text-gray-600 mb-4">
-                Click 'Start Insertion Sort' to begin the visualization
-              </p>
-              <button
-                onClick={handleStartSort}
-                className="btn btn-primary w-full sm:w-auto text-lg px-8 py-3"
-                disabled={isAnimating || arrayState.length === 0}
-              >
-                <Play className="w-5 h-5 mr-2" />
-                Start Insertion Sort
-              </button>
-            </div>
+            {/* Start Button or Controls */}
+            {!showControls ? (
+              // Show Start Button
+              <div className="card w-full">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Ready to Sort?</h3>
+                <p className="text-gray-600 mb-4">
+                  Click 'Start Insertion Sort' to begin the visualization
+                </p>
+                <button
+                  onClick={handleStartSort}
+                  className="btn btn-primary w-full sm:w-auto text-lg px-8 py-3"
+                  disabled={isAnimating || arrayState.length === 0}
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  Start Insertion Sort
+                </button>
+              </div>
+            ) : (
+              // Show Controls
+              <div className="card w-full">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Controls</h3>
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                  <button
+                    onClick={handlePlayPause}
+                    className={`btn ${isPlaying ? 'btn-secondary' : 'btn-primary'} w-full sm:w-24`}
+                    disabled={totalSteps <= 1}
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                    {isPlaying ? 'Pause' : 'Play'}
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="btn btn-secondary w-full sm:w-24"
+                    disabled={totalSteps <= 1}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset
+                  </button>
+                  <button
+                    onClick={handlePrevious}
+                    className="btn btn-secondary w-full sm:w-24"
+                    disabled={stepIndex === 0}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Previous
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="btn btn-secondary w-full sm:w-24"
+                    disabled={stepIndex === totalSteps - 1}
+                  >
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Main Visualization */}
             <div className="card w-full overflow-x-auto">
@@ -581,49 +784,6 @@ const EnhancedInsertionSort = () => {
                 </div>
               </div>
             </div>
-
-            {/* Controls */}
-            {totalSteps > 1 && (
-              <div className="card w-full">
-                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Controls</h3>
-                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                  <button
-                    onClick={handlePlayPause}
-                    className={`btn ${isPlaying ? 'btn-secondary' : 'btn-primary'} w-full sm:w-24`}
-                    disabled={totalSteps <= 1}
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                    {isPlaying ? 'Pause' : 'Play'}
-                  </button>
-                  <div className="flex flex-row gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={handleReset}
-                      className="btn btn-secondary w-full sm:w-auto"
-                      disabled={totalSteps <= 1}
-                    >
-                      <RotateCcw className="w-4 h-4 mr-1" />
-                      Reset
-                    </button>
-                    <button
-                      onClick={handlePrevious}
-                      className="btn btn-secondary w-full sm:w-auto"
-                      disabled={stepIndex === 0}
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-1" />
-                      Previous
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="btn btn-secondary w-full sm:w-auto"
-                      disabled={stepIndex >= totalSteps - 1}
-                    >
-                      Next
-                      <ArrowRight className="w-4 h-4 ml-1" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

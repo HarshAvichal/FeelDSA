@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Search, BookOpen, Code, Brain, Cpu } from 'lucide-react'
+import { Search, BookOpen, Code, Brain, Cpu, HelpCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import DsaCard from '../components/DsaCard'
 import { algorithms, dataStructures } from '../utils/algorithms'
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('Data Structure')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const navigate = useNavigate()
 
   // Combine algorithms and data structures
@@ -17,11 +17,16 @@ const Home = () => {
       if (name.includes('DP') || name.includes('Dynamic Programming')) {
         category = 'Dynamic Programming'
       }
+      // Check if it's a problem category
+      if (data.isProblemCategory) {
+        category = 'Questions'
+      }
       return {
         topic: name,
         description: data.description,
         category: category,
-        complexity: data.complexity
+        complexity: data.complexity,
+        isProblemCategory: data.isProblemCategory
       }
     })
 
@@ -29,7 +34,8 @@ const Home = () => {
       topic: name,
       description: data.description,
       category: 'Data Structure',
-      complexity: data.complexity
+      complexity: data.complexity,
+      isProblemCategory: false
     }))
 
     return [...algorithmTopics, ...dataStructureTopics]
@@ -39,15 +45,24 @@ const Home = () => {
     return allTopics.filter(topic => {
       const matchesSearch = topic.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            topic.description.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      // Only show problem categories when Questions filter is selected
+      if (selectedCategory !== 'Questions') {
+        if (topic.isProblemCategory) {
+          return false
+        }
+      }
+      
       const matchesCategory = selectedCategory === 'all' || topic.category === selectedCategory
       return matchesSearch && matchesCategory
     })
   }, [allTopics, searchTerm, selectedCategory])
 
   const categories = [
+    { id: 'all', name: 'All', icon: BookOpen },
     { id: 'Data Structure', name: 'Data Structures', icon: Brain },
     { id: 'Algorithm', name: 'Algorithms', icon: Code },
-    { id: 'all', name: 'All', icon: BookOpen },
+    { id: 'Questions', name: 'Questions', icon: HelpCircle },
   ]
 
   return (
@@ -142,6 +157,7 @@ const Home = () => {
                   description={topic.description}
                   category={topic.category}
                   complexity={topic.complexity}
+                  isProblemCategory={topic.isProblemCategory}
                   onClick={() => navigate('/enhanced-bubble-sort')}
                 />
               ) : topic.topic === 'Selection Sort' ? (
@@ -150,6 +166,7 @@ const Home = () => {
                   description={topic.description}
                   category={topic.category}
                   complexity={topic.complexity}
+                  isProblemCategory={topic.isProblemCategory}
                   onClick={() => navigate('/enhanced-selection-sort')}
                 />
               ) : topic.topic === 'Insertion Sort' ? (
@@ -158,6 +175,7 @@ const Home = () => {
                   description={topic.description}
                   category={topic.category}
                   complexity={topic.complexity}
+                  isProblemCategory={topic.isProblemCategory}
                   onClick={() => navigate('/enhanced-insertion-sort')}
                 />
               ) : topic.topic === 'Popular Binary Search Problems' ? (
@@ -166,6 +184,7 @@ const Home = () => {
                   description={topic.description}
                   category={topic.category}
                   complexity={topic.complexity}
+                  isProblemCategory={topic.isProblemCategory}
                   onClick={() => navigate('/binary-search-problems')}
                 />
               ) : (
@@ -174,6 +193,7 @@ const Home = () => {
                   description={topic.description}
                   category={topic.category}
                   complexity={topic.complexity}
+                  isProblemCategory={topic.isProblemCategory}
                 />
               )}
             </motion.div>
