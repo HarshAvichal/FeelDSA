@@ -49,7 +49,7 @@ const AITutorChat = () => {
         operationDescription: operationDescription || 'No specific operation'
       }
       
-      const response = await fetch('/api/tutor', {
+      const response = await fetch(`${window.location.origin}/api/tutor`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
